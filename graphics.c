@@ -19,7 +19,9 @@ bool checkSVGACompatibility() {
     return (axAfter == 0x004F);
 }
 
-
+void render() {
+    // Placeholder for future rendering logic
+}
 
 void initVideoMode() {
     unsigned char pal[16][3] = {
@@ -73,7 +75,7 @@ void setPalette(unsigned char colorPalette[16][3]) {
     }
 }
 
-void write(unsigned char message[], unsigned char color) {
+void write(unsigned char message[], unsigned char color, int x, int y) {
     uint8_t lineByte;
     unsigned char pixel;
     int j,i,p;
@@ -88,14 +90,14 @@ void write(unsigned char message[], unsigned char color) {
             for (i = 0; i < 8; i++) {
                 pixel = (lineByte >> (7 - i)) & 0x01;
                 if (pixel) {
-                    draw(20 + i + p*8, 20 + j, color);
+                    draw(x + i + p*8, y + j, color);
                 }
             }
         }
     }
 }
 
-void writeWithBackground(unsigned char message[], unsigned char fgColor, unsigned char bgColor) {
+void writeWithBackground(unsigned char message[], unsigned char fgColor, unsigned char bgColor, int x, int y) {
     uint8_t lineByte;
     unsigned char pixel, pixelToDraw;
     int j,i,p;
@@ -115,7 +117,7 @@ void writeWithBackground(unsigned char message[], unsigned char fgColor, unsigne
                     pixelToDraw = bgColor;
                 }
 
-                draw(20 + i + p*8, 20 + j, pixelToDraw);
+                draw(x + i + p*8, y + j, pixelToDraw);
             }
         }
     }
@@ -209,4 +211,31 @@ void drawRectangle(unsigned short x, unsigned short y, unsigned short width, uns
             draw(x + i, y + j, color);
         }
     }
+}
+
+void drawLine(unsigned short startX, unsigned short startY, unsigned short endX, unsigned short endY, unsigned char color) {
+    // edge case if start and end are the same
+    int dx, dy, steps, i;
+    float xIncrement, yIncrement, x, y;
+    
+    if (startX == endX && startY == endY) {
+        draw(startX, startY, color);
+        return;
+    }
+
+    // draw actual line
+    dx = (int) endX - (int) startX;
+    dy = (int) endY - (int) startY;
+    steps = (abs(dx) > abs(dy)) ? abs(dx) : abs(dy);
+    xIncrement = dx / (float) steps;
+    yIncrement = dy / (float) steps;
+    x = startX;
+    y = startY;
+
+    for (i = 0; i <= steps; i++) {
+        draw((unsigned short)(x + 0.5), (unsigned short)(y + 0.5), color);
+        x += xIncrement;
+        y += yIncrement;
+    }
+
 }

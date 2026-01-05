@@ -2,19 +2,19 @@
 #include <stdint.h>
 #include "mouse.h"
 #include "graphics.h"
+#include "window.h"
 
 
 
 void main() {
     int dx, dy;
+    struct Window progMgr;
     // uint8_t majorVersion, minorVersion;
 
     initVideoMode();
     dispCursor();
     drawBackground();
-    drawRectangle(100, 100, 200, 150, 12); // Draw a rectangle at (100,100) with width 200, height 150 and color 12
 
-    write("Hello, World!", 10);
     
     // __asm {
     //     mov ah, 0x30
@@ -30,8 +30,17 @@ void main() {
     //     mov ah, 0x02
     //     int 0x21
     // }
+
+    progMgr.x = 100;
+    progMgr.y = 50;
+    progMgr.width = 400;
+    progMgr.height = 300;
+    progMgr.priority = 1;
+    progMgr.isFocused = true;
+    strcpy(progMgr.title, "Program Manager");
     
-    // checkModes();
+
+    renderWindow(&progMgr);
     
     
     getch(); // Wait for a key press
