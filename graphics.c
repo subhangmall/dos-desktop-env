@@ -198,20 +198,13 @@ void renderBuffer(void) {
         }
 
         for(startingByteIdx = 0; startingByteIdx < 307200; startingByteIdx += 8) {
-            // slightly slow, so better to just not loop
-            // byte = 0;
-            // for (byteIdx = 0; byteIdx < 8; byteIdx++) {
-            //     if(vBuffer[startingByteIdx + byteIdx] & bitMask) {
-            //         // if the bit is set to 1 for the corresponding plane, set the bit in the plane to 1
-            //         byte |= 1 << (7-byteIdx);
-            //     }      
-            // }
-            // vga[vgaIdx] = byte;
-            // vgaIdx++;
             byte = 0;
-
+            
+            // start at this specific byte index
             p = &vBuffer[startingByteIdx];
 
+
+            // do it manually b/c its faster than looping and having the cpu having to calculate everything
             if (p[0] & bitMask) byte |= 0x80;
             if (p[1] & bitMask) byte |= 0x40;
             if (p[2] & bitMask) byte |= 0x20;
