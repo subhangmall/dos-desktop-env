@@ -1,19 +1,106 @@
 #include <stdbool.h>
 
+#define KEYBOARD_BUFFER_SIZE 32
+
+volatile unsigned char keyboard_buffer[KEYBOARD_BUFFER_SIZE];
+volatile int keyIdx = 0;
+
 unsigned char scrollNumberCapsLockStatusByte;
 
 unsigned char oldOffset, oldSegment;
+unsigned int curDS;
+
+void hookInterrupt();
+void disableKeyboardSet2to1Translation();
 
 void keyboardDriver() {
+    
+    // enable keyboard scanning
     __asm {
         mov al, 0xF4
         mov dl, 0x64
         out dl, al
     }
+
+    disableKeyboardSet2to1Translation();
+    hookInterrupt();
 }
 
-void updatekeyboardStatus(unsigned char interrupt) {
+void disableKeyboardSet2to1Translation() {
+    unsigned char status, config;
 
+    // wait till keyboard ready to read
+    do {
+        __asm {
+            mov dl, 0x64
+            in al, dl
+            mov status, al
+        } 
+    } while (status & 0x02);
+
+    // read current config byte; start by requesting it
+    __asm {
+        mov al, 0x20
+        mov dl, 0x64
+        out dl, al
+    }
+
+    // wait till keyboard has data ready
+    do {
+        __asm {
+            mov dl, 0x64
+            in al, dl
+            mov status, al
+        } 
+    } while (!(status & 0x01));
+
+    // actually read the byte once ready
+    __asm {
+        mov dl, 0x60
+        in al, dl
+        mov config, al
+    }
+
+    config &= 0b10111111;
+
+    // wait till keyboard ready to read
+    do {
+        __asm {
+            mov dl, 0x64
+            in al, dl
+            mov status, al
+        } 
+    } while (status & 0x02);
+
+    // write command byte
+    __asm {
+        mov dl, 0x64
+        mov al, 0x60
+        out dl, al
+    }
+
+    // wait for keyboard to be ready to read
+    do {
+        __asm {
+            mov dl, 0x64
+            in al, dl
+            mov status, al
+        } 
+    } while (status & 0x02);
+
+    // write new config byte
+    __asm {
+        mov al, config
+        mov dl, 0x60
+        out dl, al
+    } 
+}
+
+void updateKeyboardStatus(unsigned char scancode) {
+    if (keyIdx >= KEYBOARD_BUFFER_SIZE) return;
+
+    keyboard_buffer[keyIdx] = scancode;
+    keyIdx++;
 }
 
 void keyboardInterrupt() {
@@ -30,6 +117,13 @@ void keyboardInterrupt() {
         push ds
         push es
 
+
+        push ds
+        mov ax, seg curDS
+        mov ds, ax
+        mov ax, curDS
+        mov ds, ax
+
         mov dx, 0x60
         in al, dx
         
@@ -40,9 +134,21 @@ void keyboardInterrupt() {
 
         add sp, 2
 
+        // say interrupt comlete
         mov dl, 0x20
         mov al, 0x20
         out dl, al
+        
+        // notify keyboard that read interrupt
+        mov dl, 0x61
+        in al, dl
+        mov ah, al
+        or al, 0x80
+        out dl, al
+        mov al, ah
+        out dl, al
+        
+        pop ds
 
         pop es
         pop ds
@@ -54,6 +160,7 @@ void keyboardInterrupt() {
         pop bx
         pop ax
 
+
         sti
         iret
     }
@@ -63,6 +170,9 @@ void hookInterrupt() {
     void (far *func_ptr)(void) = keyboardInterrupt;
     unsigned int segment = FP_SEG(func_ptr);
     unsigned int offset = FP_OFF(func_ptr);
+    struct SREGS sregs;
+    segread(&sregs);
+    curDS = sregs.ds;
 
     // store old interrupt address
     __asm {
@@ -92,12 +202,12 @@ void sendLightStatusByte() {
         __asm {
             mov dl, 0x64
             in al, dl
-            mov statusByte, al
+            mov status, al
         }
     } while (status & 0x02);
 
     __asm {
-        mov dl, 0x64
+        mov dl, 0x60
         mov al, 0xED
         out dl, al
     }
@@ -117,7 +227,7 @@ void sendLightStatusByte() {
     }
 }
 
-bool setCapsLockLightStatus(bool val) {
+void setCapsLockLightStatus(bool val) {
     if (val) {
         scrollNumberCapsLockStatusByte |= 0b00000100;
     } else {
@@ -126,7 +236,7 @@ bool setCapsLockLightStatus(bool val) {
     sendLightStatusByte();
 }
 
-bool setScrollLockLightStatus(bool val) {
+void setScrollLockLightStatus(bool val) {
     if (val) {
         scrollNumberCapsLockStatusByte |= 0b00000100;
     } else {
@@ -135,7 +245,7 @@ bool setScrollLockLightStatus(bool val) {
     sendLightStatusByte();
 }
 
-bool setNumLockLightStatus(bool val) {
+void setNumLockLightStatus(bool val) {
     if (val) {
         scrollNumberCapsLockStatusByte |= 0b00000100;
     } else {
