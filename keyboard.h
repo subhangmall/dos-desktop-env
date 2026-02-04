@@ -1,7 +1,10 @@
+#ifndef KEYBOARD_H
+#define KEYBOARD_H
+
 #include <stdbool.h>
 
-#define KEYBOARD_H
-#ifndef KEYBOARD_H
+extern int keyIdx;
+
 
 void keyboardDriver();
 void sendLightStatusByte();

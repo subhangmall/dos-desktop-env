@@ -3,6 +3,7 @@
 #include "mouse.h"
 #include "graphics.h"
 #include "window.h"
+#include "keyboard.h"
 
 
 
@@ -37,6 +38,15 @@ void main() {
 
     renderBuffer();
     
+    keyboardDriver();
+    while (1) {
+        if (keyIdx > 0) {
+            write("jas", 15, 100, 10);
+            break;
+        }
+    }
+
+    renderBuffer();
     
     getch(); // Wait for a key press
     

@@ -11,7 +11,7 @@ unsigned char __huge *vBuffer;
 void setPalette(unsigned char colorPalette[16][3]);
 void draw(unsigned short x, unsigned short y, unsigned char color);
 
-bool checkSVGACompatibility() {
+bool checkVGACompatibility() {
     uint16_t axAfter;
 
     __asm {
@@ -23,9 +23,6 @@ bool checkSVGACompatibility() {
     return (axAfter == 0x004F);
 }
 
-void render() {
-    // Placeholder for future rendering logic
-}
 
 void initVideoMode() {
     unsigned char pal[16][3] = {
@@ -57,28 +54,6 @@ void initVideoMode() {
     setPalette(pal);
 
     vBuffer = (unsigned char __huge *)halloc(307200L, 1); // 640*480 = 307.2 kB
-}
-
-void setPalette(unsigned char colorPalette[16][3]) {
-    unsigned char colorPaletteIndex, r, g, b;
-    for (colorPaletteIndex = 0; colorPaletteIndex < 16; colorPaletteIndex++) {
-        r = colorPalette[colorPaletteIndex][0];
-        g = colorPalette[colorPaletteIndex][1];
-        b = colorPalette[colorPaletteIndex][2];
-        
-        __asm {
-            mov dx, 0x3C8
-            mov al, colorPaletteIndex 
-            out dx, al // set palette index
-            mov dx, 0x3C9
-            mov al, r  // Red
-            out dx, al
-            mov al, g  // Green
-            out dx, al
-            mov al, b  // Blue
-            out dx, al
-        }
-    }
 }
 
 void write(unsigned char message[], unsigned char color, int x, int y) {

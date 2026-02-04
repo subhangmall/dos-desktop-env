@@ -1,14 +1,19 @@
-#include <stdbool.h>
 
-#define KEYBOARD_BUFFER_SIZE 32
+#include <stdbool.h>
+#include <i86.h>
+
+#define KEYBOARD_BUFFER_SIZE (unsigned char) 32
+#define KEYBOARD_MAP_SIZE 256
 
 volatile unsigned char keyboard_buffer[KEYBOARD_BUFFER_SIZE];
-volatile int keyIdx = 0;
+volatile unsigned char keyboard_map[KEYBOARD_MAP_SIZE];
+volatile unsigned char keyIdx = 0;
 
-unsigned char scrollNumberCapsLockStatusByte;
+unsigned volatile char scrollNumberCapsLockStatusByte;
 
-unsigned char oldOffset, oldSegment;
-unsigned int curDS;
+unsigned volatile int oldOffset;
+unsigned volatile int oldSegment;
+unsigned volatile int curDS;
 
 void hookInterrupt();
 void disableKeyboardSet2to1Translation();
@@ -18,8 +23,8 @@ void keyboardDriver() {
     // enable keyboard scanning
     __asm {
         mov al, 0xF4
-        mov dl, 0x64
-        out dl, al
+        mov dx, 0x64
+        out dx, al
     }
 
     disableKeyboardSet2to1Translation();
@@ -32,8 +37,8 @@ void disableKeyboardSet2to1Translation() {
     // wait till keyboard ready to read
     do {
         __asm {
-            mov dl, 0x64
-            in al, dl
+            mov dx, 0x64
+            in al, dx
             mov status, al
         } 
     } while (status & 0x02);
@@ -41,23 +46,23 @@ void disableKeyboardSet2to1Translation() {
     // read current config byte; start by requesting it
     __asm {
         mov al, 0x20
-        mov dl, 0x64
-        out dl, al
+        mov dx, 0x64
+        out dx, al
     }
 
     // wait till keyboard has data ready
     do {
         __asm {
-            mov dl, 0x64
-            in al, dl
+            mov dx, 0x64
+            in al, dx
             mov status, al
         } 
     } while (!(status & 0x01));
 
     // actually read the byte once ready
     __asm {
-        mov dl, 0x60
-        in al, dl
+        mov dx, 0x60
+        in al, dx
         mov config, al
     }
 
@@ -66,24 +71,24 @@ void disableKeyboardSet2to1Translation() {
     // wait till keyboard ready to read
     do {
         __asm {
-            mov dl, 0x64
-            in al, dl
+            mov dx, 0x64
+            in al, dx
             mov status, al
         } 
     } while (status & 0x02);
 
     // write command byte
     __asm {
-        mov dl, 0x64
+        mov dx, 0x64
         mov al, 0x60
-        out dl, al
+        out dx, al
     }
 
     // wait for keyboard to be ready to read
     do {
         __asm {
-            mov dl, 0x64
-            in al, dl
+            mov dx, 0x64
+            in al, dx
             mov status, al
         } 
     } while (status & 0x02);
@@ -91,8 +96,8 @@ void disableKeyboardSet2to1Translation() {
     // write new config byte
     __asm {
         mov al, config
-        mov dl, 0x60
-        out dl, al
+        mov dx, 0x60
+        out dx, al
     } 
 }
 
@@ -103,95 +108,94 @@ void updateKeyboardStatus(unsigned char scancode) {
     keyIdx++;
 }
 
-void keyboardInterrupt() {
+void __loadds interrupt far keyboardInterrupt() {
     __asm {
-        cli
+        // cli
 
-        push ax
-        push bx
-        push cx
-        push dx
-        push si
-        push di
-        push bp
-        push ds
-        push es
+        // push ax
+        // push bx
+        // push ds
+        // push dx
+        
+        // get right data segment
+        // mov ax, curDS
+        // mov ds, ax
 
-
-        push ds
-        mov ax, seg curDS
-        mov ds, ax
-        mov ax, curDS
-        mov ds, ax
-
+        // read keyboard input
         mov dx, 0x60
         in al, dx
-        
         push ax
 
-        extern _updateKeyboardStatus:near
-        call _updateKeyboardStatus
+        // update keyboardMap
+        mov al, keyIdx
+        mov bl, KEYBOARD_BUFFER_SIZE
+        inc al
+        cmp al, bl
+        // if didn't exceed buffer size, then register key
+        jae done // don't store
+ 
+        store:
+            pop ax
+            mov bx, offset keyboard_buffer
+            add bx, keyIdx
+            mov bx, al
+            inc keyIdx
+            push ax
 
-        add sp, 2
-
-        // say interrupt comlete
-        mov dl, 0x20
-        mov al, 0x20
-        out dl, al
         
-        // notify keyboard that read interrupt
-        mov dl, 0x61
-        in al, dl
-        mov ah, al
-        or al, 0x80
-        out dl, al
-        mov al, ah
-        out dl, al
         
-        pop ds
+        done: 
+            pop ax
 
-        pop es
-        pop ds
-        pop bp
-        pop di
-        pop si
-        pop dx
-        pop cx
-        pop bx
-        pop ax
+            // say interrupt comlete
+            mov dx, 0x20
+            mov al, 0x20
+            out dx, al   
+        
+            // notify keyboard that read interrupt
+            mov dx, 0x61
+            in al, dx
+            mov ah, al
+            or al, 0x80
+            out dx, al
+            mov al, ah
+            out dx, al
 
+            // sti
 
-        sti
-        iret
     }
 }
 
 void hookInterrupt() {
     void (far *func_ptr)(void) = keyboardInterrupt;
-    unsigned int segment = FP_SEG(func_ptr);
-    unsigned int offset = FP_OFF(func_ptr);
+    unsigned int s = FP_SEG(func_ptr);
+    unsigned int o = FP_OFF(func_ptr);
     struct SREGS sregs;
     segread(&sregs);
     curDS = sregs.ds;
 
     // store old interrupt address
     __asm {
+        cli
         mov ah, 0x35
         mov al, 0x09
         int 0x21
         mov oldSegment, es
         mov oldOffset, bx
+        sti
     }
 
     // set new interrupt address
     __asm {
+        cli
         push ds
         mov al, 0x09
-        mov dx, offset
-        mov ds, segment
+        mov dx, o
+        mov ds, s
         mov ah, 0x25
         int 0x21
         pop ds
+        sti
     }
 }
 
@@ -200,30 +204,30 @@ void sendLightStatusByte() {
 
     do {
         __asm {
-            mov dl, 0x64
-            in al, dl
+            mov dx, 0x64
+            in al, dx
             mov status, al
         }
     } while (status & 0x02);
 
     __asm {
-        mov dl, 0x60
+        mov dx, 0x60
         mov al, 0xED
-        out dl, al
+        out dx, al
     }
 
     do {
         __asm {
-            mov dl, 0x64
-            in al, dl
-            mov statusByte, al
+            mov dx, 0x64
+            in al, dx
+            mov status, al
         }
     } while (status & 0x02);
 
     __asm {
-        mov dl, 0x60
+        mov dx, 0x60
         mov al, scrollNumberCapsLockStatusByte
-        out dl, al
+        out dx, al
     }
 }
 
@@ -238,18 +242,18 @@ void setCapsLockLightStatus(bool val) {
 
 void setScrollLockLightStatus(bool val) {
     if (val) {
-        scrollNumberCapsLockStatusByte |= 0b00000100;
+        scrollNumberCapsLockStatusByte |= 0b00000001;
     } else {
-        scrollNumberCapsLockStatusByte &= 0b00000011;
+        scrollNumberCapsLockStatusByte &= 0b00000110;
     }
     sendLightStatusByte();
 }
 
 void setNumLockLightStatus(bool val) {
     if (val) {
-        scrollNumberCapsLockStatusByte |= 0b00000100;
+        scrollNumberCapsLockStatusByte |= 0b00000010;
     } else {
-        scrollNumberCapsLockStatusByte &= 0b00000011;
+        scrollNumberCapsLockStatusByte &= 0b00000101;
     }
     sendLightStatusByte();
 }
