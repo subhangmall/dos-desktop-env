@@ -46,13 +46,13 @@ bool getSVGACompatibility() {
     // load SVGA modes into v
     asm volatile (
         "mov 0x4F00, %%ax\n\t"
-        "mov %%1, %%es\n\t"
-        "mov %%2, %%di\n\t"
-        "int 0x10\n\t"
-        "mov %%ax, %%0"
+        "mov %1, %%es\n\t"
+        "mov %2, %%di\n\t"
+        "int $0x10\n\t"
+        "mov %%ax, %0"
         : "=r" (axOutput)
-        : "m" (segment), "m" (offset)
-        : "ax", "di"
+        : "r" (segment), "r" (offset)
+        : "ax", "di", "memory"
     );
 
     // if didn't return 0x004F, it means that it's not supported
@@ -75,9 +75,9 @@ bool initSVGAModes() {
 
 void initVideoMode(unsigned char pal[16][3]) {
     asm volatile (
-        "mov 0x00, %%ah\n\t" // Set video mode
-        "mov 0x12, %%al\n\t" // 640x200 pixel graphics, 16 colors
-        "int 0x10" // Call BIOS video interrupt
+        "mov $0x00, %%ah\n\t" // Set video mode
+        "mov $0x12, %%al\n\t" // 640x200 pixel graphics, 16 colors
+        "int $0x10" // Call BIOS video interrupt
         :
         :
         : "ax"

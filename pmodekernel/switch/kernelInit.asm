@@ -1,6 +1,6 @@
 [bits 32]               
 global pModeMain     
-extern kmain            
+extern kentry          
 
 pModeMain:
     mov ax, 0x10        ; data segment selector
@@ -11,7 +11,7 @@ pModeMain:
     mov ss, ax
 
     mov esp, 0x90000    ; setup stack
-    call kmain          ; kump to C
+    call kentry          ; kump to C
 
 hang:
     hlt

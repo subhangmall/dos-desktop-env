@@ -2,7 +2,11 @@
 
 #include "../pmodedrv/vga.h"
 #include "memmgt.h"
+#include "idt.h"
 
-void kmain(void) {
-    
+
+// entry point for kernel, initialization
+void kentry(void) {
+    initMem();
+    initIDT();
 }
