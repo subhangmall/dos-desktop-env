@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include "../16bitdrv/vgaInit.h"
+#include "./memmap.h"
 
 extern void PModeMain(void);
 
@@ -44,8 +45,6 @@ unsigned char pal[16][3] = {
 };
 
 int main (void) {
-    initVideoMode(pal);
-
     gdtEntry nullDesc = {0, 0, 0, 0, 0, 0};
     gdtEntry kernelModeCodeSegment = {0xFFFF, 0, 0, 0x9A, 0xCF, 0};
     gdtEntry kernelModeDataSegment = {0xFFFF, 0, 0, 0x92, 0xCF, 0};
@@ -60,7 +59,9 @@ int main (void) {
     gdt[4] = userModeDataSegment;
 
     gdtr.limit = sizeof(gdt) - 1;
-    gdtr.base = (uint32_t)&gdt;    
+    gdtr.base = (uint32_t)&gdt;   
+    
+    initVideoMode(pal);
     
     asm volatile (
         "cli\n\t"                  // clear interrupt vector table
