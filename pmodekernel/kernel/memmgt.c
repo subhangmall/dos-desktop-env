@@ -1,8 +1,8 @@
 // paging
 #include <stdint.h>
+#include <stdbool.h>
 
-#define PAGE_TABLE_NUM_LAYERS 4
-#define PAGE_TABLE_SIZE 4096
+#define PAGE_SIZE 4096
 
 #pragma pack(push, 1)
 
@@ -24,16 +24,22 @@ struct PageTableEntry {
     uint32_t present : 1;
     uint32_t rw : 1;
     uint32_t user : 1;
-    uint32_t reserved : 9;
+    uint32_t pwt : 1;
+    uint32_t pcd : 1;
+    uint32_t accessed : 1;
+    uint32_t dirty : 1;
+    uint32_t pageTableAttrIdx : 1;
+    uint32_t globalPage : 1;
+    uint32_t available : 3;
     uint32_t pageAddress : 20;
 };
 
 #pragma pack(pop)
 
-__attribute__((aligned(4096)))
-struct PageDirectoryEntry kernelPageDirectory[1024];
-__attribute__((aligned(4096)))
-struct PageTableEntry firstKernelPageTable[1024];
+__attribute__((aligned(PAGE_SIZE)))
+struct PageDirectoryEntry kernelPageDirectory[PAGE_SIZE/sizeof(struct PageDirectoryEntry)];
+__attribute__((aligned(PAGE_SIZE)))
+struct PageTableEntry firstKernelPageTable[PAGE_SIZE/sizeof(struct PageTableEntry)];
 
 void initMem() {
     struct PageDirectoryEntry pde = {
@@ -54,11 +60,17 @@ void initMem() {
         .present = 1,
         .rw = 1,
         .user = 0,
-        .reserved = 0,
+        .pwt = 0,
+        .pcd = 0,
+        .accessed = 0,
+        .dirty = 0,
+        .pageTableAttrIdx = 0,
+        .globalPage = 0,
+        .available = 0,
         .pageAddress = 0
     };
 
-    for (int i = 0; i < 1024; i++) {
+    for (int i = 0; i < PAGE_SIZE/sizeof(struct PageTableEntry); i++) {
         kernelPageDirectory[i] = pde;
         
         pte.pageAddress = i;
@@ -99,18 +111,47 @@ void initMem() {
         : "r" (kPDAddress)
         : "eax"
     );
-
 }
 
+void* addPage(uint32_t vAddr) {
+    uint16_t ptdIdx = (uint16_t)((vAddr >> 22)&0b1111111111);
+    uint16_t pteIdx = (uint16_t)((vAddr & 0b00000000001111111111000000000000) >> 12);
+
+    if (kernelPageDirectory[ptdIdx].present == 1) {
+        // page table present
+        
+    } else {
+        // page table not present
+       __attribute__((aligned(PAGE_SIZE)))
+       struct PageTableEntry newPage[1024];
+
+       struct PageDirectoryEntry new  = {
+            .present = 1,
+            .rw = 1,
+            .user = 0,
+            .pwt = 0,
+            .pcd = 0,
+            .accessed = 0,
+            .reserved  = 0,
+            .pageSize  = 0,
+            .ignored  = 0,
+            .available = 1,
+            .pageAddress = ((uint32_t) &newPage) >> 12
+       };
+       kernelPageDirectory[ptdIdx] = new;
+       asm volatile (
+            "invlpg (%0)"
+            :
+            : "r" (vAddr)
+            : "memory"
+       );
+       return addPage(vAddr);
+    }
+}
 
 // kernel allocation, for drivers and such
 void* kalloc(int numBytes) {
-    asm volatile (
-        ""
-        :
-        :
-        :
-    );
+    
 }
 
 // zeroes out memory as well

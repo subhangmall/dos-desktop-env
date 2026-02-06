@@ -1,7 +1,7 @@
 // 16 bit real mode
 
 #include <stdint.h>
-#include "./16bitdrv/vgaInit.h"
+#include "../16bitdrv/vgaInit.h"
 
 extern void PModeMain(void);
 
@@ -43,7 +43,7 @@ unsigned char pal[16][3] = {
     {0x3F, 0x3F, 0x3F}  // 15: Pure White (Button Highlights)
 };
 
-void main (void) {
+int main (void) {
     initVideoMode(pal);
 
     gdtEntry nullDesc = {0, 0, 0, 0, 0, 0};
@@ -75,4 +75,6 @@ void main (void) {
         : "m" (gdtr)               // the gdtr structure in memory
         : "eax", "memory"          // clobbers
     );
+
+    return 0;
 }
